@@ -246,8 +246,8 @@ def gateway(
     port: int = typer.Option(18790, "--port", "-p", help="Gateway port"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ):
-    """Start the nanobot gateway."""
-    from nanobot.agent.loop import AgentLoop
+    """Start the nanobot gateway (CaMeL secure mode)."""
+    from nanobot.camel.loop import CamelAgentLoop
     from nanobot.bus.queue import MessageBus
     from nanobot.channels.manager import ChannelManager
     from nanobot.config.loader import get_data_dir, load_config
@@ -260,7 +260,7 @@ def gateway(
         import logging
         logging.basicConfig(level=logging.DEBUG)
 
-    console.print(f"{__logo__} Starting nanobot gateway on port {port}...")
+    console.print(f"{__logo__} Starting nanobot gateway on port {port} (CaMeL secure mode)...")
 
     config = load_config()
     sync_workspace_templates(config.workspace_path)
@@ -272,12 +272,14 @@ def gateway(
     cron_store_path = get_data_dir() / "cron" / "jobs.json"
     cron = CronService(cron_store_path)
 
-    # Create agent with cron service
-    agent = AgentLoop(
+    # Create agent with cron service (CaMeL secure mode)
+    agent = CamelAgentLoop(
         bus=bus,
         provider=provider,
         workspace=config.workspace_path,
         model=config.agents.defaults.model,
+        p_llm_model=config.camel.p_llm_model,
+        q_llm_model=config.camel.q_llm_model,
         temperature=config.agents.defaults.temperature,
         max_tokens=config.agents.defaults.max_tokens,
         max_iterations=config.agents.defaults.max_tool_iterations,
@@ -290,6 +292,7 @@ def gateway(
         session_manager=session_manager,
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
+        strict_mode=config.camel.strict_mode,
     )
 
     # Set cron callback (needs agent)
@@ -410,10 +413,10 @@ def agent(
     markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render assistant output as Markdown"),
     logs: bool = typer.Option(False, "--logs/--no-logs", help="Show nanobot runtime logs during chat"),
 ):
-    """Interact with the agent directly."""
+    """Interact with the agent directly (CaMeL secure mode)."""
     from loguru import logger
 
-    from nanobot.agent.loop import AgentLoop
+    from nanobot.camel.loop import CamelAgentLoop
     from nanobot.bus.queue import MessageBus
     from nanobot.config.loader import get_data_dir, load_config
     from nanobot.cron.service import CronService
@@ -433,11 +436,13 @@ def agent(
     else:
         logger.disable("nanobot")
 
-    agent_loop = AgentLoop(
+    agent_loop = CamelAgentLoop(
         bus=bus,
         provider=provider,
         workspace=config.workspace_path,
         model=config.agents.defaults.model,
+        p_llm_model=config.camel.p_llm_model,
+        q_llm_model=config.camel.q_llm_model,
         temperature=config.agents.defaults.temperature,
         max_tokens=config.agents.defaults.max_tokens,
         max_iterations=config.agents.defaults.max_tool_iterations,
@@ -449,6 +454,7 @@ def agent(
         restrict_to_workspace=config.tools.restrict_to_workspace,
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
+        strict_mode=config.camel.strict_mode,
     )
 
     # Show spinner when logs are off (no output to miss); skip when logs are on

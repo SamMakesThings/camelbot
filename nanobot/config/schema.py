@@ -320,6 +320,14 @@ class ToolsConfig(Base):
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
 
 
+class CamelConfig(Base):
+    """CaMeL security architecture configuration."""
+
+    p_llm_model: str = "anthropic/claude-sonnet-4-5"  # Model for privileged LLM (code generation)
+    q_llm_model: str = "anthropic/claude-sonnet-4-5"  # Model for quarantined LLM (data extraction)
+    strict_mode: bool = False  # If true, hard block policy violations; if false, prompt for confirmation
+
+
 class Config(BaseSettings):
     """Root configuration for nanobot."""
 
@@ -328,6 +336,7 @@ class Config(BaseSettings):
     providers: ProvidersConfig = Field(default_factory=ProvidersConfig)
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    camel: CamelConfig = Field(default_factory=CamelConfig)
 
     @property
     def workspace_path(self) -> Path:
