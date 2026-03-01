@@ -403,6 +403,14 @@ class CamelAgentLoop:
                 content="I couldn't understand that request. Please try rephrasing.",
             )
 
+        # Handle empty or invalid plans - P-LLM may return plain text for simple queries
+        if not execution_plan or not execution_plan.strip():
+            return OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content="I'm not sure how to help with that. Could you rephrase?",
+            )
+
         # Step 2: Create interpreter and execute plan
         interpreter = CamelInterpreter(
             tools=self.tools,
@@ -455,7 +463,15 @@ class CamelAgentLoop:
             )
 
         except InterpreterError as e:
-            logger.error("Interpreter error: {}", e)
+            logger.error("Interpreter error: {} | Plan was:\n{}", e, execution_plan)
+            # If it's a syntax error, the P-LLM probably returned prose instead of code
+            if "syntax" in str(e).lower():
+                # Try to extract any useful content from the failed plan
+                return OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=f"I had trouble processing that request. Here's what I was trying to do:\n\n{execution_plan[:500]}",
+                )
             return OutboundMessage(
                 channel=msg.channel,
                 chat_id=msg.chat_id,
@@ -463,11 +479,12 @@ class CamelAgentLoop:
             )
 
         except SyntaxError as e:
-            logger.error("Syntax error in generated plan: {}", e)
+            logger.error("Syntax error in generated plan: {} | Plan was:\n{}", e, execution_plan)
+            # P-LLM returned prose instead of code - show it to user
             return OutboundMessage(
                 channel=msg.channel,
                 chat_id=msg.chat_id,
-                content="I generated an invalid plan. Please try rephrasing your request.",
+                content=execution_plan[:1000] if execution_plan else "I'm not sure how to respond to that.",
             )
 
     async def close_mcp(self) -> None:

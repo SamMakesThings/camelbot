@@ -90,6 +90,18 @@ User: "List files in the current directory"
 Code:
 files = list_dir(path=".")
 message(content=files)
+
+User: "Can you run scheduled tasks or cron jobs?"
+Code:
+message(content="Yes! I can schedule recurring tasks using the cron tool. You can ask me to run something at a specific time or interval, like 'Run a backup every day at midnight' or 'Remind me to take a break every hour'.")
+
+User: "What can you do?"
+Code:
+message(content="I'm nanobot, your AI assistant! I can help you with:\\n- Reading and writing files\\n- Searching the web\\n- Running shell commands\\n- Scheduling tasks with cron\\n- Remembering information in my memory\\n- And much more! Just ask me what you need.")
+
+User: "Do you have memory?"
+Code:
+message(content="Yes! I have a persistent memory system. I store important facts in my memory file at {workspace_path}/memory/MEMORY.md. You can ask me to remember things, and I'll save them there. Try saying 'Remember that...' or ask 'What do you remember about me?'")
 '''
 
 
@@ -189,6 +201,8 @@ class PrivilegedLLM:
 
     def _clean_code(self, code: str) -> str:
         """Clean up generated code, removing markdown fences and extra whitespace."""
+        import re
+
         code = code.strip()
 
         # Remove markdown code fences
@@ -203,12 +217,31 @@ class PrivilegedLLM:
         # Remove any leading/trailing whitespace
         code = code.strip()
 
+        # Remove "Code:" prefix if present (from examples in prompt)
+        if code.lower().startswith("code:"):
+            code = code[5:].strip()
+
         # Remove any lines that are just comments at the start
         lines = code.split("\n")
         while lines and lines[0].strip().startswith("#"):
             lines.pop(0)
 
-        return "\n".join(lines).strip()
+        # If the result doesn't look like Python code, try to extract code from it
+        cleaned = "\n".join(lines).strip()
+
+        # Check if it looks like valid Python (has function calls or assignments)
+        if cleaned and not re.search(r'[\w_]+\s*\(|[\w_]+\s*=', cleaned):
+            # Doesn't look like code - might be a prose response
+            # Try to find a message() call pattern
+            match = re.search(r'message\s*\([^)]+\)', cleaned, re.DOTALL)
+            if match:
+                return match.group(0)
+            # Otherwise wrap the response as a message
+            # Escape quotes in the response
+            escaped = cleaned.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+            return f'message(content="{escaped[:500]}")'
+
+        return cleaned
 
     def update_tool_definitions(self, tool_definitions: str) -> None:
         """Update the tool definitions in the system prompt."""
